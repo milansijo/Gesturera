@@ -15,7 +15,7 @@ export default function AdminDashboard() {
   const fetchMetrics = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/admin/system', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/system`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Unauthorized or Forbidden');
@@ -29,7 +29,7 @@ export default function AdminDashboard() {
   const fetchUsers = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/admin/users', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/users`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to fetch users');
@@ -43,7 +43,7 @@ export default function AdminDashboard() {
   const fetchModelInfo = useCallback(async () => {
     if (!token) return;
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/admin/model-info', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/model-info`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (!res.ok) throw new Error('Failed to fetch model info');
@@ -75,7 +75,7 @@ export default function AdminDashboard() {
     setReloadStatus('loading');
     setReloadMsg('');
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/admin/reload-model', {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/reload-model`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });

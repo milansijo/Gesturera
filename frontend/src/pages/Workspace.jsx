@@ -20,7 +20,7 @@ export default function Workspace() {
   }, [token, navigate]);
 
   // Debounce logic matching Python terminal
-  const steadyRef = useRef({ prediction: '', count: 0, lastAppended: '' });
+  const steadyRef = useRef({ prediction: '', count: 0, lastAppended: '', emptyCount: 0 });
 
   // Keyboard shortcut listener
   useEffect(() => {
@@ -29,7 +29,7 @@ export default function Workspace() {
         setSentence(prev => prev.slice(0, -1));
       } else if (e.key === 'c' || e.key === 'C') {
         setSentence('');
-        steadyRef.current = { prediction: '', count: 0, lastAppended: '' };
+        steadyRef.current = { prediction: '', count: 0, lastAppended: '', emptyCount: 0 };
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -38,7 +38,7 @@ export default function Workspace() {
 
   // Initialize WebSockets
   useEffect(() => {
-    socketRef.current = new WebSocket('ws://127.0.0.1:8000/ws/predict');
+    socketRef.current = new WebSocket(`${import.meta.env.VITE_WS_URL}/ws/predict`);
     
     socketRef.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
@@ -135,6 +135,7 @@ export default function Workspace() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (results.landmarks && results.landmarks.length > 0) {
+          steadyRef.current.emptyCount = 0;
           ctx.fillStyle = "#4f6ef7";
           for (const landmarks of results.landmarks) {
             let coordinates = [];
@@ -154,7 +155,12 @@ export default function Workspace() {
           }
         } else {
           setCurrentSign(prev => prev !== null ? null : prev);
-          steadyRef.current.lastAppended = '';
+          steadyRef.current.emptyCount = (steadyRef.current.emptyCount || 0) + 1;
+          if (steadyRef.current.emptyCount > 20) {
+            steadyRef.current.lastAppended = '';
+            steadyRef.current.prediction = '';
+            steadyRef.current.count = 0;
+          }
         }
       } catch (error) {
         console.error("MediaPipe detection error:", error);
@@ -209,7 +215,7 @@ export default function Workspace() {
               style={{ borderColor: 'rgba(232,79,79,.4)', color: '#d44' }}
               onClick={() => {
                 setSentence('');
-                steadyRef.current = { prediction: '', count: 0, lastAppended: '' };
+                steadyRef.current = { prediction: '', count: 0, lastAppended: '', emptyCount: 0 };
               }}
             >
               Clear
