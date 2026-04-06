@@ -19,8 +19,26 @@ export default function Workspace() {
     }
   }, [token, navigate]);
 
-  // Debounce logic matching Python terminal
-  const steadyRef = useRef({ prediction: '', count: 0, lastAppended: '', emptyCount: 0 });
+  // Debounce logic: prevents duplicate letter appending
+  // - prediction: the current streak prediction
+  // - count: how many consecutive frames predicted the same sign
+  // - lastAppended: the last letter that was appended to the sentence
+  // - emptyCount: consecutive frames with no hand detected
+  // - lastAppendTime: timestamp of the last append (cooldown guard)
+  const steadyRef = useRef({
+    prediction: '',
+    count: 0,
+    lastAppended: '',
+    emptyCount: 0,
+    lastAppendTime: 0,
+  });
+
+  // Threshold: number of consecutive same-predictions required to append
+  const STEADY_THRESHOLD = 12;
+  // Cooldown: minimum ms between appends
+  const APPEND_COOLDOWN_MS = 800;
+  // Empty frames required before allowing same letter re-detection
+  const EMPTY_RESET_THRESHOLD = 40;
 
   // Keyboard shortcut listener
   useEffect(() => {
@@ -29,7 +47,13 @@ export default function Workspace() {
         setSentence(prev => prev.slice(0, -1));
       } else if (e.key === 'c' || e.key === 'C') {
         setSentence('');
-        steadyRef.current = { prediction: '', count: 0, lastAppended: '', emptyCount: 0 };
+        steadyRef.current = {
+          prediction: '',
+          count: 0,
+          lastAppended: '',
+          emptyCount: 0,
+          lastAppendTime: 0,
+        };
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -47,20 +71,34 @@ export default function Workspace() {
         setCurrentSign(raw_pred);
         
         const steady = steadyRef.current;
+        // Reset empty counter since we have a valid prediction
+        steady.emptyCount = 0;
+
         if (raw_pred === steady.prediction) {
-            steady.count += 1;
+          steady.count += 1;
         } else {
-            steady.prediction = raw_pred;
-            steady.count = 0;
+          // New prediction detected — reset the streak
+          steady.prediction = raw_pred;
+          steady.count = 1;
         }
         
-        if (steady.count > 15 && raw_pred !== steady.lastAppended) {
-            if (raw_pred === 'SPACE') {
-                setSentence(prev => prev + ' ');
-            } else {
-                setSentence(prev => prev + raw_pred);
-            }
-            steady.lastAppended = raw_pred;
+        const now = Date.now();
+        const cooldownOk = (now - steady.lastAppendTime) >= APPEND_COOLDOWN_MS;
+
+        // Only append if:
+        // 1. The streak is long enough (hand held steady)
+        // 2. This letter hasn't already been appended in the current streak
+        // 3. Enough time has passed since the last append (cooldown)
+        if (steady.count >= STEADY_THRESHOLD && raw_pred !== steady.lastAppended && cooldownOk) {
+          if (raw_pred === 'SPACE') {
+            setSentence(prev => prev + ' ');
+          } else {
+            setSentence(prev => prev + raw_pred);
+          }
+          steady.lastAppended = raw_pred;
+          steady.lastAppendTime = now;
+          // Reset count to prevent re-triggering if lastAppended is ever cleared
+          steady.count = 0;
         }
       }
     };
@@ -156,10 +194,17 @@ export default function Workspace() {
         } else {
           setCurrentSign(prev => prev !== null ? null : prev);
           steadyRef.current.emptyCount = (steadyRef.current.emptyCount || 0) + 1;
-          if (steadyRef.current.emptyCount > 20) {
-            steadyRef.current.lastAppended = '';
+          if (steadyRef.current.emptyCount >= EMPTY_RESET_THRESHOLD) {
+            // Only reset the prediction streak — do NOT reset lastAppended.
+            // This prevents the same letter from being re-appended when the
+            // hand briefly leaves and re-enters the frame with the same sign.
             steadyRef.current.prediction = '';
             steadyRef.current.count = 0;
+            // Only clear lastAppended after a very long absence (3x threshold)
+            // to allow intentional re-signing of the same letter.
+            if (steadyRef.current.emptyCount >= EMPTY_RESET_THRESHOLD * 3) {
+              steadyRef.current.lastAppended = '';
+            }
           }
         }
       } catch (error) {
@@ -215,7 +260,7 @@ export default function Workspace() {
               style={{ borderColor: 'rgba(232,79,79,.4)', color: '#d44' }}
               onClick={() => {
                 setSentence('');
-                steadyRef.current = { prediction: '', count: 0, lastAppended: '', emptyCount: 0 };
+                steadyRef.current = { prediction: '', count: 0, lastAppended: '', emptyCount: 0, lastAppendTime: 0 };
               }}
             >
               Clear
